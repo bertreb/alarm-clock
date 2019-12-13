@@ -10,7 +10,7 @@ module.exports = () ->
   fs = require('fs')
   Moment = require 'moment-timezone'
 
-  class alarm-clock
+  class alarmClock
 
     constructor: () ->
 
@@ -429,4 +429,4 @@ module.exports = () ->
       #_WT_TRACK_STOP[6] = (_track & 0xFF00) >> 8
       @port.write(Buffer.from(_WT_STOP_ALL))
 
-  return new alarm-clock
+  return new alarmClock
