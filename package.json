@@ -1,11 +1,11 @@
 {
   "name": "alarm-clock",
   "version": "0.0.1",
-  "description": "Smart home Alarm clock with remote management",
+  "description": "MQTT controllable Alarm clock",
   "main": "alarm-clock.js",
   "files": [
     "alarm-clock.js",
-    "lib"
+    "alarm-clock.coffee"
   ],
   "scripts": {},
   "repository": {
@@ -13,13 +13,12 @@
     "url": "git+https://github.com/bertreb/alarm-clock.git"
   },
   "keywords": [
-    "Smart",
-    "Home",
+    "MQTT",
     "Alarm",
     "Clock"
   ],
   "author": "bertreb",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/bertreb/alarm-clock/issues"
   },
