@@ -1,0 +1,16 @@
+{
+  "alarmclock": {
+    "state": 
+  },
+  "mqtt": {
+    "host": "",
+    "port": "",
+    "username": "",
+    "password": ""
+  },
+  "schedule": {
+    "hour": "",
+    "minute": "",
+    "days": []
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "alarm-clock",
+  "version": "0.0.1",
+  "description": "Smart home Alarm clock with remote management",
+  "main": "alarm-clock.js",
+  "files": [
+    "alarm-clock.js",
+    "lib"
+  ],
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bertreb/alarm-clock.git"
+  },
+  "keywords": [
+    "Smart",
+    "Home",
+    "Alarm",
+    "Clock"
+  ],
+  "author": "bertreb",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bertreb/alarm-clock/issues"
+  },
+  "homepage": "https://github.com/bertreb/alarm-clock#readme",
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "coffeescript": "^2.4.1",
+    "cron": "^1.7.2",
+    "moment": "^2.24.0",
+    "mqtt": "^3.0.0",
+    "node-schedule": "^1.3.2",
+    "path": "^0.12.7",
+    "rpi-gpio-buttons": "^1.1.1",
+    "serialport": "^8.x.x",
+    "winston": "^3.2.1"
+  },
+  "devDependencies": {}
+}
