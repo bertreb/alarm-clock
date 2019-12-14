@@ -7,7 +7,7 @@
     "alarm-clock.js",
     "alarm-clock.coffee",
     "coffee-cache.js",
-    "alarm-clock default.json",
+    "alarm-clock-default.json",
     "alarm-clock.service"
   ],
   "scripts": {},
