@@ -5,7 +5,10 @@
   "main": "alarm-clock.js",
   "files": [
     "alarm-clock.js",
-    "lib"
+    "alarm-clock.coffee",
+    "coffee-cache.js",
+    "alarm-clock default.json",
+    "alarm-clock.service"
   ],
   "scripts": {},
   "repository": {
