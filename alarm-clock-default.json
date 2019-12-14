@@ -1,7 +1,7 @@
 {
   "alarmclock": {
     "state": false|true,
-    "buttonPin": <nummber>
+    "buttonPin": <number>
   },
   "mqtt": {
     "host": "",

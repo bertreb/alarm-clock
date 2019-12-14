@@ -98,54 +98,54 @@ module.exports = () ->
       # init button
       #
       rpi_gpio_buttons = require('rpi-gpio-buttons')
-      @buttonPin = 22
-      @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
-      @button.on 'clicked', (p) =>
-        @logger.info("button clicked")
-        if @alarmActive
-          @stopAlarm()
-          snooze = () =>
-            @playAlarm()
-          @alarmSnooze +=1
-          if @alarmSnooze is 8
-            @logger.info("Snoozing stopped")
-            @alarmSnooze = 0
-            clearTimeout(@snozer)
-          else
-            @snozer = setTimeout(snooze,300000 - @alarmSnooze*30000)
-            @logger.info("Snoozing...")
-
-      # stop alarm and sleep
-      @button.on 'pressed', (p)=>
-        if @alarmActive
-          @stopAlarm()
-          @logger.info("Snoozing stopped")
-        if @snozer?
-          @alarmSnooze = 0
-          clearTimeout(@snozer)
-          @logger.info("Snoozing stopped")
-        @logger.info("button pressed")
-        #stop alarm and don't sleep
-      @button.on 'clicked_pressed', (p)=>
-        @logger.info("button clicked_pressed")
-        #stop alarm and don't sleep
-      @button.on 'double_clicked', (p) =>
-        @logger.info("button double clicked")
-        #action
-
       #
       # init alarm
       #
       @alarmActive = false
       @alarmSnooze = 0
 
-      #
-      # init mqtt
-      #
       @readConfig()
       .then () =>
+        @buttonPin = @config.alarmclock.buttonPin
+        @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
+        @button.on 'clicked', (p) =>
+          @logger.info("button clicked")
+          if @alarmActive
+            @stopAlarm()
+            snooze = () =>
+              @playAlarm()
+            @alarmSnooze +=1
+            if @alarmSnooze is 8
+              @logger.info("Snoozing stopped")
+              @alarmSnooze = 0
+              clearTimeout(@snozer)
+            else
+              @snozer = setTimeout(snooze,300000 - @alarmSnooze*30000)
+              @logger.info("Snoozing...")
+
+        # stop alarm and sleep
+        @button.on 'pressed', (p)=>
+          if @alarmActive
+            @stopAlarm()
+            @logger.info("Snoozing stopped")
+          if @snozer?
+            @alarmSnooze = 0
+            clearTimeout(@snozer)
+            @logger.info("Snoozing stopped")
+          @logger.info("button pressed")
+          #stop alarm and don't sleep
+        @button.on 'clicked_pressed', (p)=>
+          @logger.info("button clicked_pressed")
+          #stop alarm and don't sleep
+        @button.on 'double_clicked', (p) =>
+          @logger.info("button double clicked")
+          #action
+
         @logger.info("@config: " + JSON.stringify(@config))
         @setAlarmclock()
+        #
+        # init mqtt
+        #
         options =
           host: @config.mqtt.host
           port: @config.mqtt.port
@@ -425,8 +425,5 @@ module.exports = () ->
         @mqttClient.removeAllListeners()
         resolve()
       )
-
-
-
 
   return new AlarmClock
