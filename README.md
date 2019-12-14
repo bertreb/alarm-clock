@@ -2,6 +2,8 @@
 mqtt controllable alarm-clock
 
 Installation:
+- enable serialport (for external use) and i2c in raspi-config
+- set timezone in raspi-config
 - prepare system with node/npm and connected button
 - choose root directory (/home/pi or ...)
 - install 'alarm-clock' via git clone https://github.com/bertreb/alarm-clock.git

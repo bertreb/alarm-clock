@@ -279,7 +279,7 @@ module.exports = () ->
 
     playAlarm: () =>
       @alarmActive = true
-      @wtSolo(4)
+      @wtSolo(Math.floor((Math.random() * 5) + 1))
       @setDisplayState(2)
       @setDisplayTime()
       maxPlayTime = () =>
