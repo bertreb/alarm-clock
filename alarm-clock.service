@@ -4,7 +4,7 @@
 Description=Alarm Clock
 
 [Service]
-ExecStart=/home/pi/.nvm/versions/node/v8.16.2/bin/node alarm-clock.js
+ExecStart=/usr/local/bin/node alarm-clock.js start
 Restart=always
 RestartSec=10
 User=pi
