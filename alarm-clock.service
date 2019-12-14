@@ -1,0 +1,16 @@
+# Systemd service template for Alarm Clock
+
+[Unit]
+Description=Alarm Clock
+
+[Service]
+ExecStart=/home/pi/.nvm/versions/node/v8.16.2/bin/node alarm-clock.js
+Restart=always
+RestartSec=10
+User=pi
+Environment=PATH=/home/pi/alarm_clock:/sbin:/usr/sbin:/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/opt/node/bin
+Environment=NODE_ENV=production
+WorkingDirectory=/home/pi/alarm-clock
+
+[Install]
+WantedBy=multi-user.target

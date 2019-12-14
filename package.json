@@ -1,11 +1,11 @@
 {
   "name": "alarm-clock",
   "version": "0.0.1",
-  "description": "MQTT controllable Alarm clock",
+  "description": "Smart home Alarm clock with remote management",
   "main": "alarm-clock.js",
   "files": [
     "alarm-clock.js",
-    "alarm-clock.coffee"
+    "lib"
   ],
   "scripts": {},
   "repository": {
@@ -13,19 +13,23 @@
     "url": "git+https://github.com/bertreb/alarm-clock.git"
   },
   "keywords": [
-    "MQTT",
+    "Smart",
+    "Home",
     "Alarm",
     "Clock"
   ],
   "author": "bertreb",
-  "license": "MIT",
+  "license": "ISC",
   "bugs": {
     "url": "https://github.com/bertreb/alarm-clock/issues"
   },
   "homepage": "https://github.com/bertreb/alarm-clock#readme",
   "dependencies": {
     "bluebird": "^3.7.2",
+    "coffee-cache": "^1.0.2",
+    "coffee-script": "^1.12.7",
     "coffeescript": "^2.4.1",
+    "console-stamp": "^0.2.9",
     "cron": "^1.7.2",
     "moment": "^2.24.0",
     "mqtt": "^3.0.0",

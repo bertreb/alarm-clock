@@ -1,16 +1,17 @@
 {
   "alarmclock": {
-    "state": 
+    "state": false|true,
+    "buttonPin": <nummber>
   },
   "mqtt": {
     "host": "",
-    "port": "",
+    "port": <number>,
     "username": "",
     "password": ""
   },
   "schedule": {
-    "hour": "",
-    "minute": "",
-    "days": []
+    "hour": <number 0-23>,
+    "minute": <number 0-59>,
+    "days": [<numbers 0(sunday) .. 6 (saturday) with comma or range]
   }
 }

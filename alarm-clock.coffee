@@ -1,5 +1,5 @@
 module.exports = () ->
-
+  
   i2c = require('i2c-bus')
   SerialPort = require('serialport')
   Schedule = require('node-schedule')
@@ -18,31 +18,27 @@ module.exports = () ->
       # set logging
       #
       #filename = path.join(__dirname, 'alarm-clock.log')
-
-      winston.format.combine(
-        winston.format.colorize()
-        winston.format.json()
-      )
-
+    
       consoleOptions =
         level: 'info'
         handleExceptions: true
-        json: false
-        colorize: true
-      @logger = winston.createLogger(
+        colorize: 'all'
+        timestamp: 'YYYY-MM-DD HH:mm:ss'
+      fileOptions =
+        filename: './alarm-clock.log'
         level: 'info'
-        format: winston.format.json()
-        defaultMeta: service: 'user-service'
-          #
-          # - Write to all logs with level `info` and below to `combined.log`
-          # - Write all logs error (and below) to `error.log`.
+        handleExceptions: true
+        timestamp: 'YYYY-MM-DD HH:mm:ss'
+
+
+      @logger = winston.createLogger(
+        format: winston.format.simple(),
+        colorize: winston.format.colorize(),
         transports: [
-          new (winston.transports.File)(
-            filename: './error.log'
-            level: 'error')
-          new (winston.transports.File)(filename: './alarm-clock.log')
-          new (winston.transports.Console)(consoleOptions)
-        ])
+          new winston.transports.Console(),
+          new winston.transports.File(fileOptions)
+        ]
+      )
       @logger.info("Logger started")
 
       #
@@ -63,7 +59,7 @@ module.exports = () ->
           0x7F, # 8
           0x6F  # 9
           ]
-
+        
       @HT16K33_BLINK_CMD = 0x80
       @HT16K33_DISPLAY_ON = 0x01
       @HT16K33_DISPLAY_OFF = 0x00
@@ -85,7 +81,6 @@ module.exports = () ->
       @time = new Date()
       @time.setTime(Date.now())
       @setDots(4,true)
-      @setDisplayTime()
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         runOnInit: true
@@ -149,18 +144,8 @@ module.exports = () ->
       #
       @readConfig()
       .then () =>
-        @logger.info("@config: " + @config)
-        if @config.alarmclock.state is true
-          #_a = @setSchedule(@config.schedule)
-          @setDots(1,true)
-          _alarm = @setSchedule(@config.schedule)
-          d = new Date()
-          @logger.info "nextInvo: " + (_alarm.nextInvocation()).getDay() + ", nextDay: " + Moment(d).add(1, 'days').day() + ", toDay: " + Moment(d).day()
-          if _alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day() or _alarm.nextInvocation().getDay() is Moment(d).day()
-            @setDots(2,true)
-          else
-            @setDots(2,false)
-          @setDisplayTime()
+        @logger.info("@config: " + JSON.stringify(@config))
+        @setAlarmclock()
         options =
           host: @config.mqtt.host
           port: @config.mqtt.port
@@ -203,27 +188,28 @@ module.exports = () ->
                 try
                   data = JSON.parse(message)
                   @config["schedule"] = data
-                  @setSchedule(data)
+                  @setAlarmclock()
                   @updateConfig()
-                catch err
+                catch err  
                   @logger.error("ERROR schedule not set, error in JSON.parse mqtt message,  " + err)
       .catch (err) =>
         @logger.error "error: " + err
         return
 
-    setAlarmclock: (_state) =>
-      @config.alarmclock.state = _state
+    setAlarmclock: () =>
+      _state = @config.alarmclock.state 
       if _state is false
         @setDots(1,false)
         @setDots(2,false)
         if @alarm?
           @alarm.cancel()
-          @logger.info "Schedule cancelled"
+          @logger.info "Alarm cancelled"
       else
         @setDots(1,true)
         _alarm = @setSchedule(@config.schedule)
         d = new Date()
-        if _alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day() or _alarm.nextInvocation().getDay() is Moment(d).day()
+        if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day()
+          @logger.info "Next alarm: " + @alarm.nextInvocation()
           @setDots(2,true)
         else
           @setDots(2,false)
@@ -251,13 +237,20 @@ module.exports = () ->
             @setDots(2,false)
           @setDisplayTime()
           )
-        @logger.info "next1: " + @alarm.nextInvocation().toString()
+        #@logger.info "Next alarm: " + @alarm.nextInvocation()
+        #d = new Date()
+        #if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day() or @alarm.nextInvocation().getDay() is Moment(d).day()
+        #  if @config.alarmclock.state
+        #    @setDots(2,true)
+        #else
+        #  @setDots(2,false)
+        #@setDisplayTime()
         return @alarm
 
     readConfig: () =>
-      return new Promise ((resolve, reject) =>
+      return new Promise ((resolve, reject) =>           
         if !fs.existsSync(@configFullFilename)
-          @logger.error "Config doesn't exists!"
+          @logger.error "Config doesn't exists!" 
           reject("Config doesn't exists")
         else
           fs.readFile(@configFullFilename, 'utf8', (err, data) =>
@@ -302,7 +295,7 @@ module.exports = () ->
 
     start: (_addr) =>
       @HT16K33_ADDR = _addr
-      @i2c1 = i2c.open(1, (err) =>
+      @i2c1 = i2c.open(1, (err) => 
         if err? then throw err
         turnOnBuffer = Buffer.alloc(1)
         turnOnBuffer[0] = @TURN_OSCILLATOR_ON
@@ -326,14 +319,14 @@ module.exports = () ->
         when 2
           blinkbuffer = Buffer.alloc(1);
           blinkbuffer[0] = @HT16K33_BLINK_CMD | @HT16K33_DISPLAY_BLINK;
-          @i2c1.i2cWrite(@HT16K33_ADDR, blinkbuffer.length, blinkbuffer, (err, bytesWritten, buffer) =>
+          @i2c1.i2cWrite(@HT16K33_ADDR, blinkbuffer.length, blinkbuffer, (err, bytesWritten, buffer) => 
             if err?
               @logger.error(err)
           )
         else
           blinkbuffer = Buffer.alloc(1);
           blinkbuffer[0] = @HT16K33_BLINK_CMD | @HT16K33_DISPLAY_ON;
-          @i2c1.i2cWrite(@HT16K33_ADDR, blinkbuffer.length, blinkbuffer, (err, bytesWritten, buffer) =>
+          @i2c1.i2cWrite(@HT16K33_ADDR, blinkbuffer.length, blinkbuffer, (err, bytesWritten, buffer) => 
             if err?
               @logger.error(err)
           )
@@ -342,16 +335,16 @@ module.exports = () ->
       brightnessbuffer = Buffer.alloc(1);
       if _brightness < 0 or _brightness>15 then _brightness = 0
       brightnessbuffer[0] = @HT16K33_CMD_BRIGHTNESS | _brightness;
-      @i2c1.i2cWrite(@HT16K33_ADDR, brightnessbuffer.length, brightnessbuffer, (err, bytesWritten, buffer) =>
+      @i2c1.i2cWrite(@HT16K33_ADDR, brightnessbuffer.length, brightnessbuffer, (err, bytesWritten, buffer) => 
         if err?
           @logger.error(err)
       )
 
-    setDisplayTime: () =>
+    setDisplayTime: (_h,_m) =>
       d = Date.now()
       @time.setTime(d)
-      _hours = @time.getHours()
-      _minutes = @time.getMinutes()
+      _hours = if _h? then _h else @time.getHours()
+      _minutes = if _m? then _m else @time.getMinutes()
       if _hours < 0 or _hours > 23 then _hours = 23
       if _minutes < 0 or _minutes > 59 then minutes = 59
       if _hours < 10
@@ -372,7 +365,7 @@ module.exports = () ->
       displaybuffer[3] = @numbertable[_digit2]
       displaybuffer[5] = @dots
       displaybuffer[7] = @numbertable[_digit3]
-      displaybuffer[9] = @numbertable[_digit4]
+      displaybuffer[9] = @numbertable[_digit4]      
       @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
           #@logger.info('Display written ' + bytesWritten)
       )
@@ -380,11 +373,11 @@ module.exports = () ->
     setDots: (_nr, _state) =>
       switch _nr
         when 1
-          @dot1 = _state
+          @dot1 = _state 
         when 2
-          @dot2 = _state
+          @dot2 = _state 
         when 3
-          @dot3 = _state
+          @dot3 = _state 
         when 4
           @timedots = _state
       @dots = 0x00 | (if @dot1 then 0x08) | (if @dot2 then 0x04) | (if @dot3 then 0x10) | (if @timedots then 0x03)
@@ -410,23 +403,43 @@ module.exports = () ->
 
     wtVolume: (_volume) =>
       _WT_VOLUME = [0xF0,0xAA,0x07,0x05,0x00,0x00,0x55]
-      if _volume < -70 then _volume = -70
+      if _volume < -70 then _volume = -70 
       if _volume > 4 then _volume = 4
       _WT_VOLUME[4] = _volume & 0xFF
       _WT_VOLUME[5] = (_volume & 0xFF00) >> 8
       @port.write(Buffer.from(_WT_VOLUME))
 
-    wtSolo: (_track) =>
+    wtSolo: (_track) => 
       _WT_TRACK_SOLO = [0xF0,0xAA,0x08,0x03,0x00,0x00,0x00,0x55]
       _WT_TRACK_SOLO[5] = _track & 0xFF
       _WT_TRACK_SOLO[6] = (_track & 0xFF00) >> 8
       @port.write(Buffer.from(_WT_TRACK_SOLO))
 
-    wtStop: () =>
+    wtStop: () => 
       _WT_STOP_ALL = [0xF0,0xAA,0x05,0x04,0x55]
       #_WT_TRACK_STOP = [0xF0,0xAA,0x08,0x03,0x04,0x00,0x00,0x55]
       #_WT_TRACK_STOP[5] = _track & 0xFF
       #_WT_TRACK_STOP[6] = (_track & 0xFF00) >> 8
       @port.write(Buffer.from(_WT_STOP_ALL))
 
+    destroy:() =>
+      return new Promise( (resolve, reject) =>
+        if @alarm? then @alarm.cancel()
+        @minuteTick.stop()
+        if @snozer? then clearTimeout(@snozer)
+        @button.removeAllListeners()
+        @mqttClient.removeAllListeners()
+        resolve()
+      )
+
+
+
+    
   return new AlarmClock
+
+
+
+
+
+
+
