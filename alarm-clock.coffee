@@ -79,7 +79,6 @@ module.exports = () ->
       # init the clock
       #
       @time = new Date()
-      @time.setTime(Date.now())
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         runOnInit: true
@@ -102,6 +101,12 @@ module.exports = () ->
       #
       @alarmActive = false
       @alarmSnooze = 0
+
+      @time = new Date()
+
+      @afterBootTimer = setTimeout(()=>
+        @setDisplayTime()
+      ,2000)
 
       @readConfig()
       .then () =>
@@ -424,6 +429,7 @@ module.exports = () ->
         if @snozer? then clearTimeout(@snozer)
         @button.removeAllListeners()
         @mqttClient.removeAllListeners()
+        if @afterBootTimer? then clearTimeout(@afterBootTimer)
         resolve()
       )
 
