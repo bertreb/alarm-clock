@@ -81,7 +81,6 @@ module.exports = () ->
       @time = new Date()
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
-        runOnInit: true
         onTick: =>
           @setDisplayTime()
       @minuteTick.start()
@@ -105,8 +104,10 @@ module.exports = () ->
       @time = new Date()
 
       @afterBootTimer = setTimeout(()=>
+        @setDisplayState(1)
+        @setAlarmclock()
         @setDisplayTime()
-      ,2000)
+      ,5000)
 
       @readConfig()
       .then () =>
@@ -145,7 +146,6 @@ module.exports = () ->
           @logger.info("button double clicked")
           #action
 
-        @setAlarmclock()
         #
         # init mqtt
         #
@@ -159,8 +159,6 @@ module.exports = () ->
         @mqttClient  = mqtt.connect(options)
         @mqttClient.on 'connect', =>
           @logger.info "Connected to mqtt"
-          @setDots(4,true)
-          @setDisplayTime()
           @mqttClient.subscribe('schanswal/alarmclock/#', (err,granted)=>
             if err?
               @logger.error("Subscribe error: " + err)
@@ -196,6 +194,7 @@ module.exports = () ->
                   data = JSON.parse(message)
                   @config["schedule"] = data
                   @setAlarmclock()
+                  @setDisplayTime()
                   @updateConfig()
                 catch err
                   @logger.error("ERROR schedule not set, error in JSON.parse mqtt message,  " + err)
@@ -220,8 +219,7 @@ module.exports = () ->
           @setDots(2,true)
         else
           @setDots(2,false)
-      @setDisplayTime()
-      @updateConfig()
+      #@setDisplayTime()
 
 
     setSchedule: (data) =>
@@ -300,10 +298,12 @@ module.exports = () ->
         turnOnBuffer[0] = @TURN_OSCILLATOR_ON
         @i2c1.i2cWrite(@HT16K33_ADDR,turnOnBuffer.length, turnOnBuffer, (err, bytesWritten, buffer) =>
           if err? then throw err
-          @setDisplayState(1)
+          @setDisplayState(2)
           @setBrightness(1)
-          @setDisplayTime()
-          @minuteTick.start()
+          @setDisplayTime(0,0)
+          .then(() =>
+            @minuteTick.start()
+          )
          )
       )
 
@@ -341,33 +341,39 @@ module.exports = () ->
       )
 
     setDisplayTime: (_h,_m) =>
-      d = Date.now()
-      @time.setTime(d)
-      _hours = if _h? then _h else @time.getHours()
-      _minutes = if _m? then _m else @time.getMinutes()
-      if _hours < 0 or _hours > 23 then _hours = 23
-      if _minutes < 0 or _minutes > 59 then minutes = 59
-      if _hours < 10
-        _digit1 = 0
-        _digit2 = Number (String _hours)[0]
-      else
-        _digit1 = Number (String _hours)[0]
-        _digit2 = Number (String _hours)[1]
-      if _minutes < 10
-        _digit3 = 0
-        _digit4 = Number (String _minutes)[0]
-      else
-        _digit3 = Number (String _minutes)[0]
-        _digit4 = Number (String _minutes)[1]
+      return new Promise ( (resolve,reject) =>
+        d = Date.now()
+        @time.setTime(d)
+        _hours = if _h? then _h else @time.getHours()
+        _minutes = if _m? then _m else @time.getMinutes()
+        if _hours < 0 or _hours > 23 then _hours = 23
+        if _minutes < 0 or _minutes > 59 then minutes = 59
+        if _hours < 10
+          _digit1 = 0
+          _digit2 = Number (String _hours)[0]
+        else
+          _digit1 = Number (String _hours)[0]
+          _digit2 = Number (String _hours)[1]
+        if _minutes < 10
+          _digit3 = 0
+          _digit4 = Number (String _minutes)[0]
+        else
+          _digit3 = Number (String _minutes)[0]
+          _digit4 = Number (String _minutes)[1]
 
-      displaybuffer = Buffer.alloc(11,0x00)
-      displaybuffer[1] = @numbertable[_digit1]
-      displaybuffer[3] = @numbertable[_digit2]
-      displaybuffer[5] = @dots
-      displaybuffer[7] = @numbertable[_digit3]
-      displaybuffer[9] = @numbertable[_digit4]
-      @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
-          #@logger.info('Display written ' + bytesWritten)
+        displaybuffer = Buffer.alloc(11,0x00)
+        displaybuffer[1] = @numbertable[_digit1]
+        displaybuffer[3] = @numbertable[_digit2]
+        displaybuffer[5] = @dots
+        displaybuffer[7] = @numbertable[_digit3]
+        displaybuffer[9] = @numbertable[_digit4]
+        @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
+          if !err
+            resolve()
+          else
+            reject(err)
+            #@logger.info('Display written ' + bytesWritten)
+        )
       )
 
     setDots: (_nr, _state) =>
