@@ -86,9 +86,8 @@ module.exports = () ->
       @time = new Date()
       setClockAfterBoot = () =>
         @setDisplayState(1)
-        @setAlarmclock()
         @setDisplayTime()
-      @afterBootTimer = setTimeout(setClockAfterBoot,8000)
+      @afterBootTimer = setTimeout(setClockAfterBoot,10000)
 
       #
       # init WavTrigger
@@ -108,6 +107,7 @@ module.exports = () ->
 
       @readConfig()
       .then () =>
+        @setAlarmclock()
         @buttonPin = @config.alarmclock.buttonPin
         @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
         @button.on 'clicked', (p) =>
@@ -298,7 +298,6 @@ module.exports = () ->
           @setDisplayState(2)
           @setBrightness(1)
           @setDisplayTime(0,0)
-          @minuteTick.start()
         )
       )
 
