@@ -73,14 +73,13 @@ module.exports = () ->
       @dots = 0x00
       @setDots(4,true)
 
-      @start(0x70)
+      @startDisplay(0x70)
 
       #
       # init the clock
       #
       @time = new Date()
       @time.setTime(Date.now())
-      @setDots(4,true)
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         runOnInit: true
@@ -141,7 +140,6 @@ module.exports = () ->
           @logger.info("button double clicked")
           #action
 
-        @logger.info("@config: " + JSON.stringify(@config))
         @setAlarmclock()
         #
         # init mqtt
@@ -156,6 +154,8 @@ module.exports = () ->
         @mqttClient  = mqtt.connect(options)
         @mqttClient.on 'connect', =>
           @logger.info "Connected to mqtt"
+          @setDots(4,true)
+          @setDisplayTime()
           @mqttClient.subscribe('schanswal/alarmclock/#', (err,granted)=>
             if err?
               @logger.error("Subscribe error: " + err)
@@ -287,7 +287,7 @@ module.exports = () ->
 
       setTimeout(maxPlayTime, 30000)
 
-    start: (_addr) =>
+    startDisplay: (_addr) =>
       @HT16K33_ADDR = _addr
       @i2c1 = i2c.open(1, (err) =>
         if err? then throw err
@@ -298,6 +298,7 @@ module.exports = () ->
           @setDisplayState(1)
           @setBrightness(1)
           @minuteTick.start()
+          @setDisplayTime()
          )
       )
 
@@ -425,5 +426,8 @@ module.exports = () ->
         @mqttClient.removeAllListeners()
         resolve()
       )
+
+
+
 
   return new AlarmClock
