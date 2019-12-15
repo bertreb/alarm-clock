@@ -297,8 +297,8 @@ module.exports = () ->
           if err? then throw err
           @setDisplayState(1)
           @setBrightness(1)
-          @minuteTick.start()
           @setDisplayTime()
+          @minuteTick.start()
          )
       )
 
@@ -426,8 +426,5 @@ module.exports = () ->
         @mqttClient.removeAllListeners()
         resolve()
       )
-
-
-
 
   return new AlarmClock
