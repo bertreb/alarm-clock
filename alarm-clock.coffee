@@ -72,18 +72,23 @@ module.exports = () ->
       @timedots = false
       @dots = 0x00
       @setDots(4,true)
-
       @startDisplay(0x70)
 
       #
       # init the clock
       #
-      @time = new Date()
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         onTick: =>
           @setDisplayTime()
       @minuteTick.start()
+
+      @time = new Date()
+      setClockAfterBoot = () =>
+        @setDisplayState(1)
+        @setAlarmclock()
+        @setDisplayTime()
+      @afterBootTimer = setTimeout(setClockAfterBoot,8000)
 
       #
       # init WavTrigger
@@ -100,14 +105,6 @@ module.exports = () ->
       #
       @alarmActive = false
       @alarmSnooze = 0
-
-      @time = new Date()
-
-      @afterBootTimer = setTimeout(()=>
-        @setDisplayState(1)
-        @setAlarmclock()
-        @setDisplayTime()
-      ,5000)
 
       @readConfig()
       .then () =>
@@ -301,10 +298,8 @@ module.exports = () ->
           @setDisplayState(2)
           @setBrightness(1)
           @setDisplayTime(0,0)
-          .then(() =>
-            @minuteTick.start()
-          )
-         )
+          @minuteTick.start()
+        )
       )
 
     setDisplayState: (_state) =>
@@ -341,39 +336,33 @@ module.exports = () ->
       )
 
     setDisplayTime: (_h,_m) =>
-      return new Promise ( (resolve,reject) =>
-        d = Date.now()
-        @time.setTime(d)
-        _hours = if _h? then _h else @time.getHours()
-        _minutes = if _m? then _m else @time.getMinutes()
-        if _hours < 0 or _hours > 23 then _hours = 23
-        if _minutes < 0 or _minutes > 59 then minutes = 59
-        if _hours < 10
-          _digit1 = 0
-          _digit2 = Number (String _hours)[0]
-        else
-          _digit1 = Number (String _hours)[0]
-          _digit2 = Number (String _hours)[1]
-        if _minutes < 10
-          _digit3 = 0
-          _digit4 = Number (String _minutes)[0]
-        else
-          _digit3 = Number (String _minutes)[0]
-          _digit4 = Number (String _minutes)[1]
+      d = Date.now()
+      @time.setTime(d)
+      _hours = if _h? then _h else @time.getHours()
+      _minutes = if _m? then _m else @time.getMinutes()
+      if _hours < 0 or _hours > 23 then _hours = 23
+      if _minutes < 0 or _minutes > 59 then minutes = 59
+      if _hours < 10
+        _digit1 = 0
+        _digit2 = Number (String _hours)[0]
+      else
+        _digit1 = Number (String _hours)[0]
+        _digit2 = Number (String _hours)[1]
+      if _minutes < 10
+        _digit3 = 0
+        _digit4 = Number (String _minutes)[0]
+      else
+        _digit3 = Number (String _minutes)[0]
+        _digit4 = Number (String _minutes)[1]
 
-        displaybuffer = Buffer.alloc(11,0x00)
-        displaybuffer[1] = @numbertable[_digit1]
-        displaybuffer[3] = @numbertable[_digit2]
-        displaybuffer[5] = @dots
-        displaybuffer[7] = @numbertable[_digit3]
-        displaybuffer[9] = @numbertable[_digit4]
-        @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
-          if !err
-            resolve()
-          else
-            reject(err)
-            #@logger.info('Display written ' + bytesWritten)
-        )
+      displaybuffer = Buffer.alloc(11,0x00)
+      displaybuffer[1] = @numbertable[_digit1]
+      displaybuffer[3] = @numbertable[_digit2]
+      displaybuffer[5] = @dots
+      displaybuffer[7] = @numbertable[_digit3]
+      displaybuffer[9] = @numbertable[_digit4]
+      @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
+        #@logger.info('Display written ' + bytesWritten)
       )
 
     setDots: (_nr, _state) =>
