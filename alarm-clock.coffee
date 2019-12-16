@@ -10,7 +10,6 @@ module.exports = () ->
   winston = require('winston')
   fs = require('fs')
   Moment = require('moment-timezone')
-  ntpClient = require('ntp-client')
 
   class AlarmClock
 
@@ -113,17 +112,6 @@ module.exports = () ->
 
       @readConfig()
       .then () =>
-        ###
-        ntpClient.getNetworkTime("pool.ntp.org", 123, (err, date) =>
-          if err?
-            @logger.info("Got no ntp time, use local")
-            @logger.error err
-            d = Date.now()
-            @time.setTime(d)
-          else
-            @logger.info("Got ntp time : " + date)
-            @time.setTime(date)
-        ###
         @buttonPin = @config.alarmclock.buttonPin
         @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
         @button.on 'clicked', (p) =>
