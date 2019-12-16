@@ -10,6 +10,7 @@ module.exports = () ->
   winston = require('winston')
   fs = require('fs')
   Moment = require('moment-timezone')
+  SunCalc = require('suncalc')
 
   class AlarmClock
 
@@ -79,6 +80,7 @@ module.exports = () ->
       # init the clock
       #
       #@time = new Date()
+
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         onTick: =>
@@ -320,7 +322,12 @@ module.exports = () ->
         @i2c1.i2cWrite(@HT16K33_ADDR,turnOnBuffer.length, turnOnBuffer, (err, bytesWritten, buffer) =>
           if err? then throw err
           @setDisplayState(2)
-          @setBrightness(1)
+          d = new Date()
+          times = SunCalc.getTimes(d, 53.0128, 6.5556)
+          if Moment(d).isAfter(times.sunrise)
+            @setBrightness(10)
+          if Moment(d).isAfter(times.sunsetStart)
+            @setBrightness(0)
           @setDisplayTime(0,0)
         )
       )
