@@ -1,5 +1,6 @@
 module.exports = () ->
 
+  Promise = require('bluebird')
   i2c = require('i2c-bus')
   SerialPort = require('serialport')
   Schedule = require('node-schedule')
@@ -8,7 +9,8 @@ module.exports = () ->
   path = require('path')
   winston = require('winston')
   fs = require('fs')
-  Moment = require 'moment-timezone'
+  Moment = require('moment-timezone')
+  ntpClient = require('ntp-client')
 
   class AlarmClock
 
@@ -77,23 +79,27 @@ module.exports = () ->
       #
       # init the clock
       #
+      #@time = new Date()
       @minuteTick = new CronJob
         cronTime: '0 */1 * * * *'
         onTick: =>
           @setDisplayTime()
       @minuteTick.start()
 
-      @time = new Date()
-      setClockAfterBoot = () =>
+      afterBootDisplay = () =>
         @setDisplayState(1)
+        @setAlarmclock()
         @setDisplayTime()
-      @afterBootTimer = setTimeout(setClockAfterBoot,10000)
+
+      @afterBootTimer = setTimeout(afterBootDisplay,5000)
 
       #
       # init WavTrigger
       #
       @port = new SerialPort('/dev/ttyS0', { autoOpen: false, baudRate: 57600 })
       @wtStart()
+      @wtDefaultVolume = -10
+      @wtVolume(@wtDefaultVolume)
 
       #
       # init button
@@ -107,7 +113,17 @@ module.exports = () ->
 
       @readConfig()
       .then () =>
-        @setAlarmclock()
+        ###
+        ntpClient.getNetworkTime("pool.ntp.org", 123, (err, date) =>
+          if err?
+            @logger.info("Got no ntp time, use local")
+            @logger.error err
+            d = Date.now()
+            @time.setTime(d)
+          else
+            @logger.info("Got ntp time : " + date)
+            @time.setTime(date)
+        ###
         @buttonPin = @config.alarmclock.buttonPin
         @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
         @button.on 'clicked', (p) =>
@@ -134,6 +150,7 @@ module.exports = () ->
             @alarmSnooze = 0
             clearTimeout(@snozer)
             @logger.info("Snoozing stopped")
+          @setAlarmclock()
           @logger.info("button pressed")
           #stop alarm and don't sleep
         @button.on 'clicked_pressed', (p)=>
@@ -211,7 +228,10 @@ module.exports = () ->
         @setDots(1,true)
         _alarm = @setSchedule(@config.schedule)
         d = new Date()
-        if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day()
+        if (@alarm.nextInvocation().getDay() == Moment(d).add(1, 'days').day()) or
+          (@alarm.nextInvocation().getDay() == Moment(d).day() and
+            @alarm.nextInvocation().getHours() >= Moment(d).hour() and
+              @alarm.nextInvocation().getMinutes() > Moment(d).minute())
           @logger.info "Next alarm: " + @alarm.nextInvocation()
           @setDots(2,true)
         else
@@ -237,7 +257,7 @@ module.exports = () ->
             @setDots(2,true)
           else
             @setDots(2,false)
-          @setDisplayTime()
+            @setDisplayTime()
           )
         return @alarm
 
@@ -279,13 +299,19 @@ module.exports = () ->
 
     playAlarm: () =>
       @alarmActive = true
-      @wtSolo(Math.floor((Math.random() * 5) + 1))
+      _track = Math.floor((Math.random() * 5) + 1)
+      @wtSolo(_track)
+      @_volume = -40
+      fade = () =>
+        @_volume += 1
+        @wtVolume(@_volume)
+        setTimeout(fade,1000) if @_volume < @wtDefaultVolume
+      fade()
       @setDisplayState(2)
       @setDisplayTime()
       maxPlayTime = () =>
         @button.emit 'clicked', @buttonPin
-
-      setTimeout(maxPlayTime, 30000)
+      setTimeout(maxPlayTime, 60000)
 
     startDisplay: (_addr) =>
       @HT16K33_ADDR = _addr
@@ -335,10 +361,9 @@ module.exports = () ->
       )
 
     setDisplayTime: (_h,_m) =>
-      d = Date.now()
-      @time.setTime(d)
-      _hours = if _h? then _h else @time.getHours()
-      _minutes = if _m? then _m else @time.getMinutes()
+      _time = new Date()
+      _hours = if _h? then _h else _time.getHours()
+      _minutes = if _m? then _m else _time.getMinutes()
       if _hours < 0 or _hours > 23 then _hours = 23
       if _minutes < 0 or _minutes > 59 then minutes = 59
       if _hours < 10
@@ -376,13 +401,18 @@ module.exports = () ->
           @timedots = _state
       @dots = 0x00 | (if @dot1 then 0x08) | (if @dot2 then 0x04) | (if @dot3 then 0x10) | (if @timedots then 0x03)
 
+    clearDisplay: () =>
+      displaybuffer = Buffer.alloc(11,0x00)
+      @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
+        #@logger.info('Display written ' + bytesWritten)
+      )
+
     wtStart: () =>
       _WT_GET_VERSION = [0xF0,0xAA,0x05,0x01,0x55]
       @port.open((err) =>
         if err
           @logger.info('Error opening port: ', err.message)
         @wtPower(true)
-        @wtVolume(-10)
         # play startup tune
         @wtSolo(99)
       )
@@ -408,6 +438,19 @@ module.exports = () ->
       _WT_TRACK_SOLO[5] = _track & 0xFF
       _WT_TRACK_SOLO[6] = (_track & 0xFF00) >> 8
       @port.write(Buffer.from(_WT_TRACK_SOLO))
+
+    wtFade: (_track) =>
+      _WT_FADE = [0xF0,0xAA,0x0C,0x0A,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x55]
+      _volume = 0
+      _time = 10000
+      _WT_FADE[4] = _track & 0xFF
+      _WT_FADE[5] = (_track & 0xFF00) >> 8
+      _WT_FADE[6] = _volume & 0xFF
+      _WT_FADE[7] = (_volume & 0xFF00) >> 8
+      _WT_FADE[8] = _time & 0xFF
+      _WT_FADE[9] = (_time & 0xFF00) >> 8
+      #_WT_FADE[10] = 0x00
+      @port.write(Buffer.from(_WT_FADE))
 
     wtStop: () =>
       _WT_STOP_ALL = [0xF0,0xAA,0x05,0x04,0x55]
