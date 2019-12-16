@@ -166,9 +166,13 @@ module.exports = () ->
               @logger.error("Subscribe error: " + err)
             else
               @logger.info("subscribed to " + JSON.stringify(granted))
+              #@mqttClient.publish("schanswal/alarmclock/alarmclock/status", @config.alarmclock.state, (err) =>
+              #  if err?
+              #    @logger.info "error publishing state: " + err
+              #)
             )
         @mqttClient.on 'error', (err) =>
-          @logger.info ("Mqqt connect error: " + err)
+          @logger.info ("Mqtt connect error: " + err)
         @mqttClient.on 'message', (topic, message, packet) =>
           @logger.info(JSON.stringify("topic: " + topic + ", message: " + message))
           items = topic.split('/')
@@ -190,6 +194,7 @@ module.exports = () ->
                 else if (String message) == "off"
                   @setAlarmclock(false)
                   @logger.info "Alarmclock switched off"
+                @setDisplayTime()
                 @updateConfig()
               when "alarmtime"
                 try
@@ -200,12 +205,18 @@ module.exports = () ->
                   @updateConfig()
                 catch err
                   @logger.error("ERROR schedule not set, error in JSON.parse mqtt message,  " + err)
+              else
+                @logger.info "other message received: " + JSON.parse(message)
       .catch (err) =>
         @logger.error "error: " + err
         return
 
-    setAlarmclock: () =>
-      _state = @config.alarmclock.state
+    setAlarmclock: (_s) =>
+      if _s?
+        _state = _s
+        @config.alarmclock.state = _s
+      else
+        _state = @config.alarmclock.state
       if _state is false
         @setDots(1,false)
         @setDots(2,false)
@@ -224,7 +235,6 @@ module.exports = () ->
           @setDots(2,true)
         else
           @setDots(2,false)
-      #@setDisplayTime()
 
 
     setSchedule: (data) =>
@@ -349,33 +359,36 @@ module.exports = () ->
       )
 
     setDisplayTime: (_h,_m) =>
-      _time = new Date()
-      _hours = if _h? then _h else _time.getHours()
-      _minutes = if _m? then _m else _time.getMinutes()
-      if _hours < 0 or _hours > 23 then _hours = 23
-      if _minutes < 0 or _minutes > 59 then minutes = 59
-      if _hours < 10
-        _digit1 = 0
-        _digit2 = Number (String _hours)[0]
-      else
-        _digit1 = Number (String _hours)[0]
-        _digit2 = Number (String _hours)[1]
-      if _minutes < 10
-        _digit3 = 0
-        _digit4 = Number (String _minutes)[0]
-      else
-        _digit3 = Number (String _minutes)[0]
-        _digit4 = Number (String _minutes)[1]
+      try
+        _time = new Date()
+        _hours = if _h? then _h else _time.getHours()
+        _minutes = if _m? then _m else _time.getMinutes()
+        if _hours < 0 or _hours > 23 then _hours = 23
+        if _minutes < 0 or _minutes > 59 then minutes = 59
+        if _hours < 10
+          _digit1 = 0
+          _digit2 = Number (String _hours)[0]
+        else
+          _digit1 = Number (String _hours)[0]
+          _digit2 = Number (String _hours)[1]
+        if _minutes < 10
+          _digit3 = 0
+          _digit4 = Number (String _minutes)[0]
+        else
+          _digit3 = Number (String _minutes)[0]
+          _digit4 = Number (String _minutes)[1]
 
-      displaybuffer = Buffer.alloc(11,0x00)
-      displaybuffer[1] = @numbertable[_digit1]
-      displaybuffer[3] = @numbertable[_digit2]
-      displaybuffer[5] = @dots
-      displaybuffer[7] = @numbertable[_digit3]
-      displaybuffer[9] = @numbertable[_digit4]
-      @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
-        #@logger.info('Display written ' + bytesWritten)
-      )
+        displaybuffer = Buffer.alloc(11,0x00)
+        displaybuffer[1] = @numbertable[_digit1]
+        displaybuffer[3] = @numbertable[_digit2]
+        displaybuffer[5] = @dots
+        displaybuffer[7] = @numbertable[_digit3]
+        displaybuffer[9] = @numbertable[_digit4]
+        @i2c1.i2cWrite(@HT16K33_ADDR, displaybuffer.length, displaybuffer, (err, bytesWritten, buffer) =>
+          #@logger.info('Display written ' + bytesWritten)
+        )
+      catch err
+        @logger.info "eeror in setDisplay: " + err
 
     setDots: (_nr, _state) =>
       switch _nr
