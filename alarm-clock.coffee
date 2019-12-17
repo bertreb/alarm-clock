@@ -114,42 +114,6 @@ module.exports = () ->
 
       @readConfig()
       .then () =>
-        @buttonPin = @config.alarmclock.buttonPin
-        @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
-        @button.on 'clicked', (p) =>
-          @logger.info("button clicked")
-          if @alarmActive
-            @stopAlarm()
-            snooze = () =>
-              @playAlarm()
-            @alarmSnooze +=1
-            if @alarmSnooze is 8
-              @logger.info("Snoozing stopped")
-              @alarmSnooze = 0
-              clearTimeout(@snozer)
-            else
-              @snozer = setTimeout(snooze,300000 - @alarmSnooze*30000)
-              @logger.info("Snoozing...")
-
-        # stop alarm and sleep
-        @button.on 'pressed', (p)=>
-          if @alarmActive
-            @stopAlarm()
-            @logger.info("Snoozing stopped")
-          if @snozer?
-            @alarmSnooze = 0
-            clearTimeout(@snozer)
-            @logger.info("Snoozing stopped")
-          @setAlarmclock()
-          @logger.info("button pressed")
-          #stop alarm and don't sleep
-        @button.on 'clicked_pressed', (p)=>
-          @logger.info("button clicked_pressed")
-          #stop alarm and don't sleep
-        @button.on 'double_clicked', (p) =>
-          @logger.info("button double clicked")
-          #action
-
         #
         # init mqtt
         #
@@ -168,10 +132,10 @@ module.exports = () ->
               @logger.error("Subscribe error: " + err)
             else
               @logger.info("subscribed to " + JSON.stringify(granted))
-              #@mqttClient.publish("schanswal/alarmclock/alarmclock/status", @config.alarmclock.state, (err) =>
-              #  if err?
-              #    @logger.info "error publishing state: " + err
-              #)
+              @mqttClient.publish("schanswal/alarmclock/alarmclock/status", (if @config.alarmclock.state then "on" else "off"), (err) =>
+                if err?
+                  @logger.info "error publishing state: " + err
+              )
             )
         @mqttClient.on 'error', (err) =>
           @logger.info ("Mqtt connect error: " + err)
@@ -209,6 +173,53 @@ module.exports = () ->
                   @logger.error("ERROR schedule not set, error in JSON.parse mqtt message,  " + err)
               else
                 @logger.info "other message received: " + JSON.parse(message)
+
+        #
+        # button definitions
+        #
+        @buttonPin = @config.alarmclock.buttonPin
+        @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
+        @button.on 'clicked', (p) =>
+          @logger.info("button clicked")
+          if @alarmActive
+            @stopAlarm()
+            @blinkDot(true)
+            snooze = () =>
+              @playAlarm()
+            @alarmSnooze +=1
+            if @alarmSnooze is 8
+              @button.emit 'pressed', p
+              @logger.info("Snoozing stopped")
+              @alarmSnooze = 0
+              clearTimeout(@snozer)
+            else
+              @snozer = setTimeout(snooze,300000 - @alarmSnooze*30000)
+              @logger.info("Snoozing...")
+          else
+            @mqttClient.publish("schanswal/alarmclock/button", "1", (err) =>
+              if err?
+                @logger.info "error publishing state: " + err
+            )
+        @button.on 'pressed', (p)=>
+          # stop alarm and sleep
+          if @alarmActive
+            @stopAlarm()
+            @logger.info("Snoozing stopped")
+          if @snozer?
+            @alarmSnooze = 0
+            clearTimeout(@snozer)
+            @logger.info("Snoozing stopped")
+          @blinkDot(false)
+          @setAlarmclock()
+          @logger.info("button pressed")
+          #stop alarm and don't sleep
+        @button.on 'clicked_pressed', (p)=>
+          @logger.info("button clicked_pressed")
+          #stop alarm and don't sleep
+        @button.on 'double_clicked', (p) =>
+          @logger.info("button double clicked")
+          #action
+
       .catch (err) =>
         @logger.error "error: " + err
         return
@@ -299,13 +310,13 @@ module.exports = () ->
 
     playAlarm: () =>
       @alarmActive = true
-      _track = Math.floor((Math.random() * 5) + 1)
+      _track = Math.floor((Math.random() * 4) + 2)
       @wtSolo(_track)
       @_volume = -40
       fade = () =>
         @_volume += 1
         @wtVolume(@_volume)
-        setTimeout(fade,1000) if @_volume < @wtDefaultVolume
+        @fadeTimer = setTimeout(fade,1000) if @_volume < @wtDefaultVolume
       fade()
       @setDisplayState(2)
       @setDisplayTime()
@@ -324,9 +335,9 @@ module.exports = () ->
           @setDisplayState(2)
           d = new Date()
           times = SunCalc.getTimes(d, 53.0128, 6.5556)
-          if Moment(d).isAfter(times.sunrise)
+          if Moment(d).isAfter(times.sunrise) and Moment(d).isBefore(times.sunsetStart)
             @setBrightness(10)
-          if Moment(d).isAfter(times.sunsetStart)
+          else
             @setBrightness(0)
           @setDisplayTime(0,0)
         )
@@ -396,6 +407,24 @@ module.exports = () ->
         )
       catch err
         @logger.info "eeror in setDisplay: " + err
+
+
+    blinkDot: (_enabled) =>
+      @blinkOn = false
+      @dotstate = false
+      if _enabled
+        @blinkOn = true
+        dotBlinking = () =>
+          @dotState = !@dotState
+          @setDots(2,@dotState)
+          @setDisplayTime()
+          @blinkDotTimer = setTimeout(dotBlinking,1000) unless @blinkOn is false
+        dotBlinking()
+      else
+        if @blinkDotTimer? then clearTimeout(@blinkDotTimer)
+        @setDots(2,false)
+        @setDisplayTime()
+        @blinkOn = false
 
     setDots: (_nr, _state) =>
       switch _nr
@@ -475,6 +504,8 @@ module.exports = () ->
         @button.removeAllListeners()
         @mqttClient.removeAllListeners()
         if @afterBootTimer? then clearTimeout(@afterBootTimer)
+        if @blinkDotTimer? then clearTimeout(@blinkDotTimer)
+        if @fadeTimer? then clearTimeout(@fadeTimer)
         resolve()
       )
 
