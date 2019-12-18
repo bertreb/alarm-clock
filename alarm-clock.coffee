@@ -77,20 +77,27 @@ module.exports = () ->
       @startDisplay(0x70)
 
       #
-      # init the clock
+      # init alarm
       #
-      #@time = new Date()
-
-      @minuteTick = new CronJob
-        cronTime: '0 */1 * * * *'
-        onTick: =>
-          @setDisplayTime()
-      @minuteTick.start()
+      @alarmActive = false
+      @alarmSnooze = 0
 
       afterBootDisplay = () =>
         @setDisplayState(1)
         @setAlarmclock()
         @setDisplayTime()
+        @minuteTick = new CronJob
+          cronTime: '0 */1 * * * *'
+          onTick: =>
+            @setDisplayTime()
+        @minuteTick.start()
+        @dayTick = new CronJob
+          cronTime: '0 1 0 * * *'
+          onTick: =>
+            @setAlarmclock()
+            @logger.info "Midnight new day setAlarmClock"
+            @setDisplayTime()
+        @dayTick.start()
 
       @afterBootTimer = setTimeout(afterBootDisplay,5000)
 
@@ -106,11 +113,6 @@ module.exports = () ->
       # init button
       #
       rpi_gpio_buttons = require('rpi-gpio-buttons')
-      #
-      # init alarm
-      #
-      @alarmActive = false
-      @alarmSnooze = 0
 
       @readConfig()
       .then () =>
@@ -503,6 +505,7 @@ module.exports = () ->
         @port.close()
         if @alarm? then @alarm.cancel()
         @minuteTick.stop()
+        @dayTick.stop()
         if @snozer? then clearTimeout(@snozer)
         @button.removeAllListeners()
         @mqttClient.removeAllListeners()
