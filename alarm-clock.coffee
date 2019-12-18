@@ -185,6 +185,7 @@ module.exports = () ->
             @stopAlarm()
             @blinkDot(true)
             snooze = () =>
+              @alarmActive = true
               @playAlarm()
             @alarmSnooze +=1
             if @alarmSnooze is 8
@@ -193,7 +194,7 @@ module.exports = () ->
               @alarmSnooze = 0
               clearTimeout(@snozer)
             else
-              @snozer = setTimeout(snooze,300000 - @alarmSnooze*30000)
+              @snozer = setTimeout(snooze,300000)
               @logger.info("Snoozing...")
           else
             @mqttClient.publish("schanswal/alarmclock/button", "1", (err) =>
@@ -266,6 +267,7 @@ module.exports = () ->
           d = new Date()
           if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day()
             @setDots(2,true)
+            @setDisplayTime()
           else
             @setDots(2,false)
             @setDisplayTime()
@@ -336,7 +338,7 @@ module.exports = () ->
           d = new Date()
           times = SunCalc.getTimes(d, 53.0128, 6.5556)
           if Moment(d).isAfter(times.sunrise) and Moment(d).isBefore(times.sunsetStart)
-            @setBrightness(10)
+            @setBrightness(4)
           else
             @setBrightness(0)
           @setDisplayTime(0,0)
@@ -412,6 +414,7 @@ module.exports = () ->
     blinkDot: (_enabled) =>
       @blinkOn = false
       @dotstate = false
+      if @blinkDotTimer? then clearTimeout(@blinkDotTimer)
       if _enabled
         @blinkOn = true
         dotBlinking = () =>
@@ -421,7 +424,6 @@ module.exports = () ->
           @blinkDotTimer = setTimeout(dotBlinking,1000) unless @blinkOn is false
         dotBlinking()
       else
-        if @blinkDotTimer? then clearTimeout(@blinkDotTimer)
         @setDots(2,false)
         @setDisplayTime()
         @blinkOn = false
@@ -498,6 +500,7 @@ module.exports = () ->
 
     destroy:() =>
       return new Promise( (resolve, reject) =>
+        @port.close()
         if @alarm? then @alarm.cancel()
         @minuteTick.stop()
         if @snozer? then clearTimeout(@snozer)
