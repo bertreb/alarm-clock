@@ -19,7 +19,8 @@
     "Smart",
     "Home",
     "Alarm",
-    "Clock"
+    "Clock",
+    "Mqtt"
   ],
   "author": "bertreb",
   "license": "ISC",
@@ -34,11 +35,11 @@
     "coffeescript": "^2.4.1",
     "console-stamp": "^0.2.9",
     "cron": "^1.7.2",
+    "dateformat": "^3.0.3",
     "i2c-bus": "^5.1.0",
     "moment": "^2.24.0",
     "mqtt": "^3.0.0",
     "node-schedule": "^1.3.2",
-    "ntp-client": "^0.5.3",
     "path": "^0.12.7",
     "rpi-gpio-buttons": "^1.1.1",
     "serialport": "^8.x.x",

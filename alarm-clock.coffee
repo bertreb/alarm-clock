@@ -10,6 +10,7 @@ module.exports = () ->
   winston = require('winston')
   fs = require('fs')
   Moment = require('moment-timezone')
+  dateformat = require('dateformat')
   SunCalc = require('suncalc')
 
   class AlarmClock
@@ -61,6 +62,20 @@ module.exports = () ->
           0x7F, # 8
           0x6F  # 9
           ]
+
+      dateformat.i18n =
+        dayNames: [
+          'Zon', 'Maa', 'Din', 'Woe', 'Don', 'Vri', 'Zat',
+            'Zondag', 'Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag', 'Zaterdag'
+        ],
+        monthNames: [
+          'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dec',
+            'Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'
+        ],
+        timeNames: [
+          'a', 'p', 'am', 'pm', 'A', 'P', 'AM', 'PM'
+        ]
+
 
       @HT16K33_BLINK_CMD = 0x80
       @HT16K33_DISPLAY_ON = 0x01
@@ -174,7 +189,7 @@ module.exports = () ->
                 catch err
                   @logger.error("ERROR schedule not set, error in JSON.parse mqtt message,  " + err)
               else
-                @logger.info "other message received: " + JSON.parse(message)
+                @logger.info "other message received: " + message
 
         #
         # button definitions
@@ -248,6 +263,10 @@ module.exports = () ->
             @alarm.nextInvocation().getHours() >= Moment(d).hour() and
               @alarm.nextInvocation().getMinutes() > Moment(d).minute())
           @logger.info "Next alarm: " + @alarm.nextInvocation()
+          @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
+            if err?
+              @logger.info "error publishing next alarmtime: " + err
+          )
           @setDots(2,true)
         else
           @setDots(2,false)
@@ -266,6 +285,10 @@ module.exports = () ->
         @alarm = Schedule.scheduleJob(rule,() =>
           @playAlarm()
           @logger.info "Next alarm: " + @alarm.nextInvocation()
+          @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
+            if err?
+              @logger.info "error publishing next alarmtime: " + err
+          )
           d = new Date()
           if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day()
             @setDots(2,true)
