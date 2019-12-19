@@ -27,14 +27,15 @@ module.exports = () ->
         level: 'debug'
         format: winston.format.combine(
           winston.format.timestamp(),
+          winston.format.colorize(),
           winston.format.printf((info) =>
-            ts = dateformat(info.timestamp, "yyyy-mm-dd HH:MM:ss:l")
-            return "[#{ts}][#{info.level}] #{info.message}"
+            ts = dateformat(info.timestamp, "HH:MM:ss:l")
+            return "#{ts} [#{info.level}] #{info.message}"
           )
         )
         transports: [
-          new winston.transports.Console({format: winston.format.combine(winston.format.colorize({all:true}))}),
-          new winston.transports.File({filename: logfile})
+          new winston.transports.Console({format: winston.format.combine(winston.format.colorize({level:true}))}),
+          new winston.transports.File({filename: logfile, format: winston.format.uncolorize({level:false})})
         ]
       })
 
