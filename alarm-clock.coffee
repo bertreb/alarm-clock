@@ -12,6 +12,7 @@ module.exports = () ->
   Moment = require('moment-timezone')
   dateformat = require('dateformat')
   SunCalc = require('suncalc')
+  rpi_gpio_buttons = require('rpi-gpio-buttons')
 
   class AlarmClock
 
@@ -20,28 +21,23 @@ module.exports = () ->
       #
       # set logging
       #
-      #filename = path.join(__dirname, 'alarm-clock.log')
+      logfile = path.join(__dirname, 'alarm-clock.log')
 
-      consoleOptions =
-        level: 'info'
-        handleExceptions: true
-        colorize: 'all'
-        timestamp: 'YYYY-MM-DD HH:mm:ss'
-      fileOptions =
-        filename: './alarm-clock.log'
-        level: 'info'
-        handleExceptions: true
-        timestamp: 'YYYY-MM-DD HH:mm:ss'
-
-
-      @logger = winston.createLogger(
-        format: winston.format.simple(),
-        colorize: winston.format.colorize(),
+      @logger = winston.createLogger({
+        level: 'debug'
+        format: winston.format.combine(
+          winston.format.timestamp(),
+          winston.format.printf((info) =>
+            ts = dateformat(info.timestamp, "yyyy-mm-dd HH:MM:ss:l")
+            return "[#{ts}][#{info.level}] #{info.message}"
+          )
+        )
         transports: [
-          new winston.transports.Console(),
-          new winston.transports.File(fileOptions)
+          new winston.transports.Console({format: winston.format.combine(winston.format.colorize({all:true}))}),
+          new winston.transports.File({filename: logfile})
         ]
-      )
+      })
+
       @logger.info("Logger started")
 
       #
@@ -123,11 +119,6 @@ module.exports = () ->
       @wtStart()
       @wtDefaultVolume = -10
       @wtVolume(@wtDefaultVolume)
-
-      #
-      # init button
-      #
-      rpi_gpio_buttons = require('rpi-gpio-buttons')
 
       @readConfig()
       .then () =>
@@ -213,7 +204,7 @@ module.exports = () ->
             else
               @snozer = setTimeout(snooze,300000)
               @logger.info("Snoozing...")
-          else
+          else if @alarmSnooze is 0
             @mqttClient.publish("schanswal/alarmclock/button", "1", (err) =>
               if err?
                 @logger.info "error publishing state: " + err
