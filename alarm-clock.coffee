@@ -34,10 +34,19 @@ module.exports = () ->
           )
         )
         transports: [
-          new winston.transports.Console({format: winston.format.combine(winston.format.colorize({level:true}))}),
-          new winston.transports.File({filename: logfile, format: winston.format.uncolorize({level:false})})
+          #new winston.transports.Console({
+          #  format: winston.format.combine(winston.format.colorize({level:true}))
+          #}),
+          new winston.transports.File({
+            filename: logfile,
+            format: winston.format.uncolorize({level:false})
+          })
         ]
       })
+      if (process.env.NODE_ENV isnt 'production')
+        @logger.add(new winston.transports.Console({
+          format: winston.format.combine(winston.format.colorize({level:true}))
+        }))
 
       @logger.info("Logger started")
 
