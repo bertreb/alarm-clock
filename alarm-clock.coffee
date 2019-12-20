@@ -10,6 +10,7 @@ module.exports = () ->
   winston = require('winston')
   fs = require('fs')
   Moment = require('moment-timezone')
+  colors = require "colors"
   dateformat = require('dateformat')
   SunCalc = require('suncalc')
   rpi_gpio_buttons = require('rpi-gpio-buttons')
@@ -29,8 +30,10 @@ module.exports = () ->
           winston.format.timestamp(),
           winston.format.colorize(),
           winston.format.printf((info) =>
-            ts = dateformat(info.timestamp, "HH:MM:ss:l")
-            return "#{ts} [#{info.level}] #{info.message}"
+            #ts = dateformat(info.timestamp, "HH:MM:ss:l")
+            ts2 = Moment(info.timestamp).format("HH:mm:ss.SSS")
+            ts2 = ts2.grey
+            return "#{ts2} [#{info.level}] #{info.message}"
           )
         )
         transports: [
@@ -197,7 +200,7 @@ module.exports = () ->
         #
         @buttonPin = @config.alarmclock.buttonPin
         @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
-        @button.setTiming({debounce: 50, clicked: 400, pressed: 400 })
+        @button.setTiming({debounce: 100, clicked: 300, pressed: 600 })
         @button.on 'clicked', (p) =>
           @logger.info("button clicked")
           if @alarmActive
@@ -260,15 +263,15 @@ module.exports = () ->
         @setDots(1,true)
         _alarm = @setSchedule(@config.schedule)
         d = new Date()
+        @logger.info "Next alarm: " + @alarm.nextInvocation()
+        @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
+          if err?
+            @logger.info "error publishing next alarmtime: " + err
+        )
         if (@alarm.nextInvocation().getDay() == Moment(d).add(1, 'days').day()) or
           (@alarm.nextInvocation().getDay() == Moment(d).day() and
             @alarm.nextInvocation().getHours() >= Moment(d).hour() and
               @alarm.nextInvocation().getMinutes() > Moment(d).minute())
-          @logger.info "Next alarm: " + @alarm.nextInvocation()
-          @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
-            if err?
-              @logger.info "error publishing next alarmtime: " + err
-          )
           @setDots(2,true)
         else
           @setDots(2,false)
@@ -333,15 +336,18 @@ module.exports = () ->
 
     stopAlarm: () =>
       @alarmActive = false
+      if @fadeTimer? then clearTimeout(@fadeTimer)
+      if @maxPlayTimer? then clearTimeout(@maxPlayTimer)
       @wtStop()
       @setDisplayState(1)
       @setDisplayTime()
 
     playAlarm: () =>
       @alarmActive = true
+      @_volume = -40
+      @wtVolume(@_volume)
       _track = Math.floor((Math.random() * 4) + 2)
       @wtSolo(_track)
-      @_volume = -40
       fade = () =>
         @_volume += 1
         @wtVolume(@_volume)
@@ -351,7 +357,7 @@ module.exports = () ->
       @setDisplayTime()
       maxPlayTime = () =>
         @button.emit 'clicked', @buttonPin
-      setTimeout(maxPlayTime, 60000)
+      @maxPlayTimer = setTimeout(maxPlayTime, 60000)
 
     startDisplay: (_addr) =>
       @HT16K33_ADDR = _addr
@@ -532,6 +538,7 @@ module.exports = () ->
         @minuteTick.stop()
         @dayTick.stop()
         if @snozer? then clearTimeout(@snozer)
+        if @maxPlayTimer? then clearTimeout(@maxPlayTimer)
         @button.removeAllListeners()
         @mqttClient.removeAllListeners()
         if @afterBootTimer? then clearTimeout(@afterBootTimer)
