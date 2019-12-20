@@ -197,6 +197,7 @@ module.exports = () ->
         #
         @buttonPin = @config.alarmclock.buttonPin
         @button = rpi_gpio_buttons([@buttonPin],{ mode: rpi_gpio_buttons.MODE_BCM })
+        @button.setTiming({debounce: 50, clicked: 400, pressed: 400 })
         @button.on 'clicked', (p) =>
           @logger.info("button clicked")
           if @alarmActive
