@@ -30,16 +30,12 @@ module.exports = () ->
           winston.format.timestamp(),
           winston.format.colorize(),
           winston.format.printf((info) =>
-            #ts = dateformat(info.timestamp, "HH:MM:ss:l")
             ts2 = Moment(info.timestamp).format("HH:mm:ss.SSS")
             ts2 = ts2.grey
             return "#{ts2} [#{info.level}] #{info.message}"
           )
         )
         transports: [
-          #new winston.transports.Console({
-          #  format: winston.format.combine(winston.format.colorize({level:true}))
-          #}),
           new winston.transports.File({
             filename: logfile,
             format: winston.format.uncolorize({level:false})
@@ -115,13 +111,38 @@ module.exports = () ->
           onTick: =>
             @setDisplayTime()
         @minuteTick.start()
-        @dayTick = new CronJob
+        @brightnessTick = new CronJob
           cronTime: '0 1 0 * * *'
+          runOnInit: true
+          onTick: =>
+            @logger.info "Midnight sunrise and sunset update"
+            d = new Date()
+            times = SunCalc.getTimes(d, @config.alarmclock.latitude, @config.alarmclock.longitude)
+            if @timerSunrise? then clearTimeout(@timerSunrise)
+            if @timerSunset? then clearTimeout(@timerSunset)
+            onSunrise = () =>
+              @setBrightness(4)
+              @logger.info "Sunrise, brightness to 4"
+            onSunset = () =>
+              @setBrightness(0)
+              @logger.info "Sunset, brightness to 0"
+            _timeToSunrise = times.sunrise - Date.now()
+            _timeToSunset = times.sunset - Date.now()
+            if _timeToSunrise > 0
+                @timerSunrise = setTimeout(onSunrise, _timeToSunrise)
+                @logger.info "Brigtness sunrise set at " + times.sunrise.toString()
+            if _timeToSunset > 0
+                @timerSunset = setTimeout(onSunset, _timeToSunset)
+                @logger.info "Brigtness sunset set at " + times.sunset.toString()
+        @brightnessTick.start()
+        @nextAlarmTick = new CronJob
+          cronTime: '0 0 12 * * *'
+          runOnInit: true
           onTick: =>
             @setAlarmclock()
-            @logger.info "Midnight new day setAlarmClock"
             @setDisplayTime()
-        @dayTick.start()
+            @logger.info "Noon new day setAlarmClock"
+        @nextAlarmTick.start()
 
       @afterBootTimer = setTimeout(afterBootDisplay,5000)
 
@@ -369,7 +390,7 @@ module.exports = () ->
           if err? then throw err
           @setDisplayState(2)
           d = new Date()
-          times = SunCalc.getTimes(d, 53.0128, 6.5556)
+          times = SunCalc.getTimes(d, @config.latitude, @config.longitude)
           if Moment(d).isAfter(times.sunrise) and Moment(d).isBefore(times.sunsetStart)
             @setBrightness(4)
           else
@@ -536,14 +557,17 @@ module.exports = () ->
         @port.close()
         if @alarm? then @alarm.cancel()
         @minuteTick.stop()
-        @dayTick.stop()
-        if @snozer? then clearTimeout(@snozer)
-        if @maxPlayTimer? then clearTimeout(@maxPlayTimer)
+        @nextAlarmTick.stop()
+        @brightnessTick.stop()
         @button.removeAllListeners()
         @mqttClient.removeAllListeners()
+        if @snozer? then clearTimeout(@snozer)
+        if @maxPlayTimer? then clearTimeout(@maxPlayTimer)
         if @afterBootTimer? then clearTimeout(@afterBootTimer)
         if @blinkDotTimer? then clearTimeout(@blinkDotTimer)
         if @fadeTimer? then clearTimeout(@fadeTimer)
+        if @timerSunrise? then clearTimeout(@timerSunrise)
+        if @timerSunset? then clearTimeout(@timerSunset)
         resolve()
       )
 
