@@ -122,10 +122,10 @@ module.exports = () ->
             if @timerSunrise? then clearTimeout(@timerSunrise)
             if @timerSunset? then clearTimeout(@timerSunset)
             onSunrise = () =>
-              @setBrightness(4)
+              @setBrightness(@config.alarmclock.brightnessDay)
               @logger.info "Sunrise, brightness to 4"
             onSunset = () =>
-              @setBrightness(0)
+              @setBrightness(@config.alarmclock.brightnessNight)
               @logger.info "Sunset, brightness to 0"
             _timeToSunrise = times.sunrise - Date.now()
             _timeToSunset = times.sunset - Date.now()
@@ -408,9 +408,9 @@ module.exports = () ->
           d = new Date()
           times = SunCalc.getTimes(d, @config.latitude, @config.longitude)
           if Moment(d).isAfter(times.sunrise) and Moment(d).isBefore(times.sunsetStart)
-            @setBrightness(4)
+            @setBrightness(@config.alarmclock.brightnessDay)
           else
-            @setBrightness(0)
+            @setBrightness(@config.alarmclock.brightnessNight)
           @setDisplayTime(0,0)
         )
       )

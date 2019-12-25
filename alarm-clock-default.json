@@ -1,7 +1,13 @@
 {
   "alarmclock": {
-    "state": false|true,
-    "buttonPin": <number>
+    "state": true,
+    "buttonPin": <pinNumber>,
+    "latitude": <lat>,
+    "longitude": <lon>,
+    "country": "<country code>",
+    "disableOnHolidays": true,
+    "brightnessDay": 8,
+    "brightnessNight": 3
   },
   "mqtt": {
     "host": "",
