@@ -14,6 +14,7 @@ module.exports = () ->
   dateformat = require('dateformat')
   SunCalc = require('suncalc')
   rpi_gpio_buttons = require('rpi-gpio-buttons')
+  dateholidays = require 'date-holidays'
 
   class AlarmClock
 
@@ -112,7 +113,7 @@ module.exports = () ->
             @setDisplayTime()
         @minuteTick.start()
         @brightnessTick = new CronJob
-          cronTime: '0 1 0 * * *'
+          cronTime: '0 0 3 * * *'
           runOnInit: true
           onTick: =>
             @logger.info "Midnight sunrise and sunset update"
@@ -128,9 +129,11 @@ module.exports = () ->
               @logger.info "Sunset, brightness to 0"
             _timeToSunrise = times.sunrise - Date.now()
             _timeToSunset = times.sunset - Date.now()
+            @logger.info "Brightness sunrise set at " + times.sunrise.toString() + ", _timeToSunrise: " + _timeToSunrise
             if _timeToSunrise > 0
                 @timerSunrise = setTimeout(onSunrise, _timeToSunrise)
-                @logger.info "Brigtness sunrise set at " + times.sunrise.toString()
+                @logger.info "Brightness sunrise set at " + times.sunrise.toString()
+            @logger.info "Brightness sunset set at " + times.sunset.toString() + ", _timeToSunset: " + _timeToSunset
             if _timeToSunset > 0
                 @timerSunset = setTimeout(onSunset, _timeToSunset)
                 @logger.info "Brigtness sunset set at " + times.sunset.toString()
@@ -156,6 +159,9 @@ module.exports = () ->
 
       @readConfig()
       .then () =>
+
+        @dh = new dateholidays(@config.alarmclock.country, @config.alarmclock.state)
+
         #
         # init mqtt
         #
@@ -284,19 +290,21 @@ module.exports = () ->
         @setDots(1,true)
         _alarm = @setSchedule(@config.schedule)
         d = new Date()
-        @logger.info "Next alarm: " + @alarm.nextInvocation()
-        @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
-          if err?
-            @logger.info "error publishing next alarmtime: " + err
-        )
-        if (@alarm.nextInvocation().getDay() == Moment(d).add(1, 'days').day()) or
-          (@alarm.nextInvocation().getDay() == Moment(d).day() and
-            @alarm.nextInvocation().getHours() >= Moment(d).hour() and
-              @alarm.nextInvocation().getMinutes() > Moment(d).minute())
+        tomorrow = Moment(d).add(1, 'days')
+        tomorrowIsHoliday = @dh.isHoliday(tomorrow)
+        nextDayNoHoliday = (@config.alarmclock.disableOnHolidays and not tomorrowIsHoliday) or (not @config.alarmclock.disableOnHolidays)
+        if _alarm.nextInvocation() is tomorrow and nextDayNoHoliday
           @setDots(2,true)
+          @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(_alarm.nextInvocation(), "dddd H:MM"), (err) =>
+            if err?
+              @logger.info "error publishing next alarmtime: " + err
+          )
         else
           @setDots(2,false)
-
+          @mqttClient.publish("schanswal/alarmclock/nextalarm", "geen alarm", (err) =>
+            if err?
+              @logger.info "error publishing next alarmtime: " + err
+          )
 
     setSchedule: (data) =>
       @logger.info "data: " + JSON.stringify(data)
@@ -309,19 +317,27 @@ module.exports = () ->
         if @alarm? then @alarm.cancel()
         @logger.info "Schedule set for " + data.hour  + ":" + data.minute + ", on days: " + data.days
         @alarm = Schedule.scheduleJob(rule,() =>
-          @playAlarm()
-          @logger.info "Next alarm: " + @alarm.nextInvocation()
-          @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM, d-m-yyyy"), (err) =>
-            if err?
-              @logger.info "error publishing next alarmtime: " + err
-          )
           d = new Date()
-          if @alarm.nextInvocation().getDay() is Moment(d).add(1, 'days').day()
+          todayIsHoliday = @dh.isHoliday(d)
+          unless @config.alarmclock.disableOnHolidays and todayIsHoliday
+            @playAlarm()
+          if @config.alarmclock.disableOnHolidays and todayIsHoliday
+            @logger.info "Today is a holiday"
+          tomorrow = Moment(d).add(1, 'days')
+          tomorrowIsHoliday = @dh.isHoliday(tomorrow)
+          nextDayNoHoliday = (@config.alarmclock.disableOnHolidays and not tomorrowIsHoliday) or (not @config.alarmclock.disableOnHolidays)
+          if @alarm.nextInvocation() is tomorrow and nextDayNoHoliday
             @setDots(2,true)
-            @setDisplayTime()
+            @mqttClient.publish("schanswal/alarmclock/nextalarm", dateformat(@alarm.nextInvocation(), "dddd H:MM"), (err) =>
+              if err?
+                @logger.info "error publishing next alarmtime: " + err
+            )
           else
             @setDots(2,false)
-            @setDisplayTime()
+            @mqttClient.publish("schanswal/alarmclock/nextalarm", "geen alarm", (err) =>
+              if err?
+                @logger.info "error publishing next alarmtime: " + err
+            )
           )
         return @alarm
 
